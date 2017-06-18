@@ -10,7 +10,7 @@ def recognize(models: dict, test_set: SinglesData):
    :param test_set: SinglesData object
    :return: (list, list)  as probabilities, guesses
        both lists are ordered by the test set word_id
-       probabilities is a list of dictionaries where each key a word and value is Log Liklihood
+       probabilities is a list of dictionaries where each key a word and value is Log Likelihood
            [{SOMEWORD': LogLvalue, 'SOMEOTHERWORD' LogLvalue, ... },
             {SOMEWORD': LogLvalue, 'SOMEOTHERWORD' LogLvalue, ... },
             ]
@@ -20,6 +20,28 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-    # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+
+    X_lengths = test_set.get_all_Xlengths()
+
+    for X, lengths in X_lengths.values():
+        max_score = None
+        best_choice = None
+        scores_dict = dict()
+
+        for word, model in models.items():
+            try:
+                score = model.score(X, lengths)
+            except:
+                score = float("-inf")
+
+            scores_dict[word] = score
+
+            # Here, a better score increases the level and adopts the word as the best choice.
+            if (max_score is None) or (score > max_score):
+                max_score = score
+                best_choice = word
+
+        probabilities.append(scores_dict)
+        guesses.append(best_choice)
+
+    return probabilities, guesses

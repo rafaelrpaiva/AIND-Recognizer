@@ -75,10 +75,24 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        bic_scores = []
+        range_components = range(self.min_n_components, self.max_n_components + 1)
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        try:
+            for n in range_components:
+                # BIC = −2 * logL + * p logN, where L is the likelihood of the fitted model,
+                # p is the number of parameters and N is the number of data points.
+                model = self.base_model(n)
+                logL = model.score(self.X, self.lengths)
 
+                p = n**2 + 2 * n * model.n_features - 1
+                bic_score = -2 * logL + p * math.log(n)
+                bic_scores.append(bic_score)
+        except:
+            pass
+
+        states = range_components[np.argmax(bic_scores)] if bic_scores else self.n_constant
+        return self.base_model(states)
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -91,18 +105,54 @@ class SelectorDIC(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        dic_scores = []
+        logsL = []
+        range_components = range(self.min_n_components, self.max_n_components + 1)
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        try:
+            for n_component in range_components:
+                model = self.base_model(n_component)
+                logsL.append(model.score(self.X, self.lengths))
+            sum_logsL = sum(logsL)
+            m = len(range_components)
 
+            for i in logsL:
+                # DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
+                all_but_i = (sum_logsL - i) / (m - 1)
+                dic_scores.append(i - all_but_i)
+        except:
+            pass
+
+        states = range_components[np.argmax(dic_scores)] if dic_scores else self.n_constant
+        return self.base_model(states)
 
 class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
 
     '''
-
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        mean_scores = []
+
+        # Using KFold as presented in the notebook
+        split_method = KFold()
+        range_components = range(self.min_n_components, self.max_n_components + 1)
+
+        try:
+            for n_component in range_components:
+                model = self.base_model(n_component)
+                # Fold and calculate model mean scores
+                fold_scores = []
+                for _, test_idx in split_method.split(self.sequences):
+                    # Get test sequences, using combine_sequences as presented in the notebook
+                    test_X, test_length = combine_sequences(test_idx, self.sequences)
+                    # Save the combined model score
+                    fold_scores.append(model.score(test_X, test_length))
+
+                mean_scores.append(np.mean(fold_scores))
+        except:
+            pass
+
+        states = range_components[np.argmax(mean_scores)] if mean_scores else self.n_constant
+        return self.base_model(states)
